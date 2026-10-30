@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>제주 바다 스톱워치</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Jua&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --panel: rgba(8, 14, 34, 0.62);
+    --panel-edge: rgba(255, 255, 255, 0.85);
+    --ink: #FFFFFF;
+    --muted: #C9D6EA;
+    --accent: #FFC857;
+    --accent-ink: #2A1A05;
+    --fast: #7CF2B0;
+    --slow: #FF9A8A;
+    --page: #3E8EDE;
+    color-scheme: light;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --panel: rgba(4, 8, 22, 0.7); --page: #0B1028; color-scheme: dark; }
+  }
+  :root[data-theme="dark"] { --panel: rgba(4, 8, 22, 0.7); --page: #0B1028; color-scheme: dark; }
+  *, *::before, *::after { box-sizing: inherit; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font-family: "Jua", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    overflow: hidden;
+  }
+  #sea {
+    position: fixed; top: 0; left: 0; z-index: 0;
+    image-rendering: pixelated; image-rendering: crisp-edges;
+  }
+  main {
+    position: relative; z-index: 1;
+    height: 100%; overflow-y: auto;
+    max-width: 460px; margin: 0 auto;
+    padding: 1.25rem 1rem 2rem;
+    display: flex; flex-direction: column; gap: 1rem;
+  }
+  .panel {
+    background: var(--panel);
+    box-shadow: 0 -4px 0 0 var(--panel-edge), 0 4px 0 0 var(--panel-edge),
+                -4px 0 0 0 var(--panel-edge), 4px 0 0 0 var(--panel-edge);
+    margin: 4px;
+  }
+  .bar {
+    display: flex; justify-content: space-between; align-items: center; gap: .75rem;
+    font-size: 1rem; text-shadow: 2px 2px 0 rgba(0,0,0,.5);
+  }
+  .bar label { display: flex; align-items: center; gap: .5rem; }
+  select {
+    font: inherit; color: var(--ink); background: var(--panel);
+    border: 3px solid var(--panel-edge); border-radius: 0; padding: .2rem .4rem;
+  }
+  select option { color: #111; background: #fff; }
+  .clock { padding: 1.4rem 1rem 1.1rem; text-align: center; }
+  .time {
+    font-family: "Press Start 2P", "Courier New", monospace;
+    font-size: clamp(1.55rem, 8.4vw, 2.7rem);
+    line-height: 1.15; white-space: nowrap;
+    text-shadow: 4px 4px 0 rgba(0,0,0,.45);
+  }
+  .time .cs { font-size: .6em; color: var(--accent); }
+  .lapnow {
+    margin-top: .7rem; min-height: 1.2rem; color: var(--muted);
+    font-family: "Press Start 2P", monospace; font-size: .7rem;
+  }
+  .controls { display: flex; gap: 1rem; padding: 0 4px; }
+  button {
+    flex: 1; font: inherit; font-size: 1.25rem; cursor: pointer;
+    padding: .8rem 0; border: 0; border-radius: 0;
+    color: var(--ink); background: var(--panel);
+    box-shadow: 0 -4px 0 0 var(--panel-edge), 0 4px 0 0 var(--panel-edge),
+                -4px 0 0 0 var(--panel-edge), 4px 0 0 0 var(--panel-edge),
+                inset 0 -5px 0 0 rgba(0,0,0,.35);
+    margin: 4px;
+  }
+  button:active { transform: translateY(3px); box-shadow: 0 -4px 0 0 var(--panel-edge), 0 4px 0 0 var(--panel-edge), -4px 0 0 0 var(--panel-edge), 4px 0 0 0 var(--panel-edge); }
+  button:disabled { opacity: .45; cursor: default; transform: none; }
+  button:focus-visible, select:focus-visible { outline: 3px dashed var(--accent); outline-offset: 6px; }
+  #toggle.running { background: var(--accent); color: var(--accent-ink); }
+  .laps { max-height: 30vh; overflow-y: auto; padding: .3rem .9rem; }
+  .laps ol { list-style: none; margin: 0; padding: 0; }
+  .laps li {
+    display: grid; grid-template-columns: 3rem 1fr 1fr; align-items: baseline;
+    padding: .5rem 0; border-bottom: 2px dotted rgba(255,255,255,.25);
+    font-family: "Press Start 2P", monospace; font-size: .62rem;
+  }
+  .laps li:last-child { border-bottom: 0; }
+  .laps li span:nth-child(2), .laps li span:nth-child(3) { text-align: right; }
+  .laps li span:nth-child(3) { color: var(--muted); }
+  .laps li.fast span:nth-child(2) { color: var(--fast); }
+  .laps li.slow span:nth-child(2) { color: var(--slow); }
+  .laps .head { font-family: "Jua", sans-serif; font-size: .9rem; color: var(--muted); }
+  .laps[hidden] { display: none; }
+  .keys { margin: 0; text-align: center; font-size: .85rem; color: var(--ink); text-shadow: 2px 2px 0 rgba(0,0,0,.55); }
+  @media (hover: none) { .keys { display: none; } }
+</style>
+</head>
+<body>
+<canvas id="sea" aria-hidden="true"></canvas>
+<main>
+  <div class="bar">
+    <span id="when">지금: 한낮</span>
+    <label>하루 길이
+      <select id="cycle">
+        <option value="10000">10초</option>
+        <option value="30000">30초</option>
+        <option value="60000">1분</option>
+        <option value="300000">5분</option>
+        <option value="1800000">30분</option>
+        <option value="3600000">1시간</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="panel clock">
+    <div class="time" id="time" role="timer" aria-live="off">00:00<span class="cs">.00</span></div>
+    <div class="lapnow" id="lapnow"></div>
+  </div>
+
+  <div class="controls">
+    <button id="side" disabled>랩</button>
+    <button id="toggle">시작</button>
+  </div>
+
+  <p class="keys">Space 시작/정지 &nbsp; L 랩 &nbsp; R 초기화</p>
+
+  <section class="panel laps" id="lapbox" aria-label="랩 기록" hidden>
+    <ol id="laps"></ol>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+
+  /* ───────── 스톱워치 상태 ───────── */
+  let state = { running: false, startedAt: 0, elapsed: 0, laps: [], cycle: 300000 };
+  const KEY = 'jeju-stopwatch';
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (s && Array.isArray(s.laps)) state = Object.assign(state, s);
+  } catch (e) {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
+
+  const total = () => state.elapsed + (state.running ? Date.now() - state.startedAt : 0);
+  const lapSum = () => state.laps.reduce((a, b) => a + b, 0);
+  const p2 = n => String(n).padStart(2, '0');
+  function fmt(ms) {
+    const cs = Math.floor(ms / 10) % 100, s = Math.floor(ms / 1000) % 60;
+    const m = Math.floor(ms / 60000) % 60, h = Math.floor(ms / 3600000);
+    return { main: (h ? h + ':' : '') + p2(m) + ':' + p2(s), cs: '.' + p2(cs) };
+  }
+  const fmtText = ms => { const f = fmt(ms); return f.main + f.cs; };
+
+  const timeEl = $('time'), lapNowEl = $('lapnow'), toggleBtn = $('toggle'), sideBtn = $('side');
+  const lapsEl = $('laps'), lapBox = $('lapbox'), whenEl = $('when'), cycleSel = $('cycle');
+  cycleSel.value = String(state.cycle);
+  if (!cycleSel.value) { state.cycle = 300000; cycleSel.value = '300000'; }
+
+  function renderButtons() {
+    const t = total();
+    toggleBtn.textContent = state.running ? '정지' : (t > 0 ? '계속' : '시작');
+    toggleBtn.classList.toggle('running', state.running);
+    sideBtn.textContent = state.running || t === 0 ? '랩' : '초기화';
+    sideBtn.disabled = !state.running && t === 0;
+  }
+  function renderLaps() {
+    lapsEl.innerHTML = '';
+    lapBox.hidden = state.laps.length === 0;
+    if (!state.laps.length) return;
+    const head = document.createElement('li');
+    head.className = 'head';
+    head.innerHTML = '<span>랩</span><span>구간</span><span>누적</span>';
+    lapsEl.appendChild(head);
+    const min = Math.min(...state.laps), max = Math.max(...state.laps);
+    let acc = 0;
+    state.laps.map((ms, i) => {
+      acc += ms;
+      const li = document.createElement('li');
+      if (state.laps.length > 1 && ms === min) li.className = 'fast';
+      else if (state.laps.length > 1 && ms === max) li.className = 'slow';
+      li.innerHTML = '<span>' + (i + 1) + '</span><span>' + fmtText(ms) + '</span><span>' + fmtText(acc) + '</span>';
+      return li;
+    }).reverse().forEach(li => lapsEl.appendChild(li));
+  }
+  function toggle() {
+    if (state.running) { state.elapsed = total(); state.running = false; }
+    else { state.startedAt = Date.now(); state.running = true; }
+    save(); renderButtons();
+  }
+  function lap() { if (!state.running) return; state.laps.push(total() - lapSum()); save(); renderLaps(); }
+  function reset() {
+    if (state.running) return;
+    state = { running: false, startedAt: 0, elapsed: 0, laps: [], cycle: state.cycle };
+    save(); renderButtons(); renderLaps();
+  }
+  toggleBtn.addEventListener('click', toggle);
+  sideBtn.addEventListener('click', () => state.running ? lap() : reset());
+  cycleSel.addEventListener('change', () => { state.cycle = +cycleSel.value; save(); });
+  document.addEventListener('keydown', e => {
+    if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || e.target.tagName === 'SELECT') return;
+    if (e.code === 'Space') { e.preventDefault(); toggle(); }
+    else if (e.key === 'l' || e.key === 'L') lap();
+    else if (e.key === 'r' || e.key === 'R') reset();
+  });
+
+  /* ───────── 픽셀 제주 바다 ───────── */
+  const cvs = $('sea'), ctx = cvs.getContext('2d');
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let W, H, PX, hy, img, buf, stars, rockTop, seongTop, hallaTop, clouds, boats, gulls, floats;
+
+  function hash(x, y) {
+    let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263)) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  }
+  const lerp = (a, b, f) => a + (b - a) * f;
+  const mix = (A, B, f) => [lerp(A[0], B[0], f), lerp(A[1], B[1], f), lerp(A[2], B[2], f)];
+  const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+  // 하루의 색 (phase 0 → 1)
+  const K = [
+    { p: 0.00, top: [62, 140, 222], bot: [170, 220, 242], far: [70, 160, 205], near: [18, 98, 150], hill: [128, 168, 190], land: [72, 110, 92], rock: [50, 54, 60] },
+    { p: 0.34, top: [70, 138, 214], bot: [196, 226, 238], far: [70, 155, 198], near: [20, 92, 145], hill: [130, 165, 184], land: [68, 102, 88], rock: [48, 52, 58] },
+    { p: 0.47, top: [84, 122, 192], bot: [246, 210, 152], far: [118, 146, 172], near: [30, 82, 128], hill: [150, 140, 152], land: [72, 82, 84], rock: [44, 44, 50] },
+    { p: 0.555, top: [62, 70, 150], bot: [255, 138, 76], far: [214, 124, 104], near: [62, 58, 108], hill: [124, 88, 118], land: [60, 48, 66], rock: [36, 30, 40] },
+    { p: 0.625, top: [40, 38, 100], bot: [214, 88, 102], far: [128, 70, 112], near: [36, 38, 84], hill: [82, 58, 96], land: [40, 32, 58], rock: [26, 22, 34] },
+    { p: 0.72, top: [14, 20, 52], bot: [52, 46, 98], far: [32, 36, 78], near: [14, 22, 50], hill: [36, 36, 66], land: [22, 22, 40], rock: [16, 16, 24] },
+    { p: 0.86, top: [4, 6, 18], bot: [14, 20, 48], far: [14, 22, 48], near: [5, 11, 28], hill: [18, 22, 42], land: [11, 13, 24], rock: [9, 9, 15] },
+    { p: 0.93, top: [8, 10, 30], bot: [24, 28, 64], far: [18, 26, 56], near: [7, 14, 34], hill: [26, 28, 52], land: [15, 16, 30], rock: [12, 12, 18] },
+    { p: 0.97, top: [54, 64, 128], bot: [244, 164, 128], far: [128, 116, 154], near: [30, 52, 104], hill: [104, 104, 142], land: [50, 56, 74], rock: [30, 30, 38] },
+    { p: 1.00, top: [62, 140, 222], bot: [170, 220, 242], far: [70, 160, 205], near: [18, 98, 150], hill: [128, 168, 190], land: [72, 110, 92], rock: [50, 54, 60] }
+  ];
+  function palette(ph) {
+    let i = 0;
+    while (i < K.length - 2 && ph > K[i + 1].p) i++;
+    const a = K[i], b = K[i + 1], f = smooth(0, 1, (ph - a.p) / (b.p - a.p));
+    const out = {};
+    for (const k of ['top', 'bot', 'far', 'near', 'hill', 'land', 'rock']) out[k] = mix(a[k], b[k], f);
+    return out;
+  }
+  function phaseName(ph) {
+    if (ph < 0.40) return '한낮';
+    if (ph < 0.51) return '늦은 오후';
+    if (ph < 0.64) return '노을';
+    if (ph < 0.92) return '밤';
+    return '새벽';
+  }
+
+  function resize() {
+    PX = Math.max(3, Math.ceil(innerWidth / 220));
+    W = Math.ceil(innerWidth / PX);
+    H = Math.ceil(innerHeight / PX);
+    cvs.width = W; cvs.height = H;
+    cvs.style.width = W * PX + 'px'; cvs.style.height = H * PX + 'px';
+    img = ctx.createImageData(W, H); buf = img.data;
+    hy = Math.floor(H * 0.62);
+
+    stars = [];
+    const n = Math.floor(W * hy / 60);
+    for (let i = 0; i < n; i++) stars.push({ x: hash(i, 1) * W | 0, y: hash(i, 2) * hy * 0.92 | 0, b: 0.35 + hash(i, 3) * 0.65, s: hash(i, 4) * 6.28 });
+
+    // 한라산: 멀리 넓고 완만하게
+    hallaTop = new Int16Array(W).fill(-1);
+    const hc = W * 0.58, hw = W * 0.44, hh = Math.round(W * 0.055) + 3;
+    for (let x = 0; x < W; x++) {
+      const d = Math.abs(x - hc) / hw;
+      if (d < 1) {
+        let h = hh * Math.pow(1 - d * d, 1.6);
+        if (d < 0.05) h -= 1; // 백록담
+        if (h >= 1) hallaTop[x] = Math.round(hy - h);
+      }
+    }
+    // 성산일출봉: 평평한 분화구 꼭대기와 가파른 절벽
+    seongTop = new Int16Array(W).fill(-1);
+    const sc = W * 0.14, top = W * 0.055, base = W * 0.115, sh = Math.round(W * 0.085) + 3;
+    for (let x = 0; x < W; x++) {
+      const d = Math.abs(x - sc);
+      let h = 0;
+      if (d <= top) h = sh - (hash(x, 9) > 0.55 ? 1 : 0) - (hash(x, 10) > 0.85 ? 1 : 0);
+      else if (d <= base) h = sh * Math.pow(1 - (d - top) / (base - top), 0.75);
+      if (x < sc) h = Math.max(h, 2);                        // 육지 쪽 목
+      if (x > sc && x < sc + base + W * 0.06) h = Math.max(h, 1);
+      const ux = sc + base + W * 0.13, uw = W * 0.045;
+      if (Math.abs(x - ux) < uw) h = Math.max(h, 3.2 * (1 - ((x - ux) / uw) ** 2));
+      if (h >= 1) seongTop[x] = Math.round(hy - h);
+    }
+    // 앞쪽 현무암 바위
+    rockTop = new Int16Array(W).fill(H);
+    const seaH = H - hy;
+    for (let x = 0; x < W; x++) {
+      const bl = Math.max(0, 1 - Math.pow(x / (W * 0.36), 2));
+      const br = Math.max(0, 1 - Math.pow((W - x) / (W * 0.32), 2));
+      let h = seaH * 0.4 * Math.max(Math.pow(bl, 0.7), Math.pow(br, 0.7));
+      h += Math.sin(x * 0.7) * 1.2 + (hash(x, 11) * 2 | 0);
+      if (h > 1.5) rockTop[x] = Math.round(H - h);
+    }
+    clouds = [0.12, 0.5, 0.82].map((f, i) => ({
+      x0: W * f, y: Math.round(hy * [0.26, 0.14, 0.36][i]),
+      rx: Math.max(6, W * [0.075, 0.1, 0.065][i]), sp: [0.5, 0.3, 0.7][i]
+    }));
+    boats = [0.42, 0.63, 0.8].map((f, i) => ({ f, i }));
+    gulls = [0.1, 0.45, 0.7].map((f, i) => ({ x0: W * f, y: Math.round(hy * [0.3, 0.42, 0.22][i]), sp: [6, 8.5, 5][i] }));
+    floats = [0.3, 0.39, 0.47, 0.55].map((f, i) => ({ x: Math.round(W * f), y: hy + Math.round((H - hy) * [0.34, 0.46, 0.3, 0.52][i]) }));
+  }
+
+  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  function setPx(x, y, c) {
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    const i = (y * W + x) * 4;
+    buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
+  }
+  function blendPx(x, y, c, a) {
+    if (x < 0 || y < 0 || x >= W || y >= H || a <= 0) return;
+    const i = (y * W + x) * 4;
+    buf[i] += (c[0] - buf[i]) * a; buf[i + 1] += (c[1] - buf[i + 1]) * a; buf[i + 2] += (c[2] - buf[i + 2]) * a;
+  }
+
+  function line(x0, y0, x1, y1, c, a = 1) {
+    x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+    const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+    let err = dx + dy;
+    for (let n = 0; n < 200; n++) {
+      a >= 1 ? setPx(x0, y0, c) : blendPx(x0, y0, c, a);
+      if (x0 === x1 && y0 === y1) break;
+      const e2 = 2 * err;
+      if (e2 >= dy) { err += dy; x0 += sx; }
+      if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+  }
+
+  const HAREUBANG = [
+    '..###..',
+    '.#####.',
+    '.#####.',
+    '#######',
+    '.#####.',
+    '.#o#o#.',
+    '.#####.',
+    '.##o##.',
+    '.#####.',
+    '#######',
+    '#######',
+    '.#####.',
+    '.#####.'
+  ];
+
+  function draw(phase, anim) {
+    const P = palette(phase);
+    const night = smooth(0.6, 0.74, phase) * (1 - smooth(0.93, 0.975, phase));
+    const day = Math.max(1 - smooth(0.5, 0.7, phase), smooth(0.95, 1, phase));
+
+    // 하늘
+    for (let y = 0; y < hy; y++) {
+      const c = mix(P.top, P.bot, Math.pow(y / hy, 1.4));
+      for (let x = 0; x < W; x++) setPx(x, y, c);
+    }
+    // 별
+    if (night > 0.01) for (const s of stars) {
+      blendPx(s.x, s.y, [255, 252, 235], night * s.b * (0.55 + 0.45 * Math.sin(anim * 2.2 + s.s)));
+    }
+    // 노을빛과 밤의 어둠을 사물 색에 입히기
+    const shadowCol = mix(P.rock, [0, 0, 0], 0.25);
+    const tint = c => mix(mix(c, P.bot, 0.3 * (1 - day) * (1 - night)), shadowCol, 0.82 * night + 0.25 * (1 - day) * (1 - night));
+
+    // 별똥별
+    if (night > 0.3) {
+      const per = 5.5, k = Math.floor(anim / per), lt = anim - k * per;
+      if (lt < 0.9 && hash(k, 31) > 0.35) {
+        const x0 = W * (0.3 + hash(k, 32) * 0.7), y0 = hy * (0.05 + hash(k, 33) * 0.3);
+        const len = W * 0.25, pr = lt / 0.9;
+        const hx = x0 - len * pr, hy2 = y0 + len * 0.45 * pr;
+        for (let j = 0; j < 10; j++) blendPx(Math.round(hx + j * 1.6), Math.round(hy2 - j * 0.72), [255, 250, 230], night * (1 - j / 10) * (1 - pr * 0.5));
+      }
+    }
+    // 달
+    const mU = (phase - 0.64) / 0.3;
+    let moon = null;
+    if (mU > 0 && mU < 1) {
+      const mr = Math.max(3, Math.round(W * 0.018));
+      const mx = Math.round(W * (0.12 + 0.76 * mU)), my = Math.round(hy - hy * 0.72 * Math.sin(mU * Math.PI));
+      const ma = smooth(0, 0.08, mU) * (1 - smooth(0.88, 1, mU));
+      moon = { x: mx, y: my, a: ma };
+      for (let dy = -mr; dy <= mr; dy++) for (let dx = -mr; dx <= mr; dx++) {
+        const inA = dx * dx + dy * dy <= mr * mr;
+        const ox = dx - mr * 0.55, oy = dy + mr * 0.25;
+        const inB = ox * ox + oy * oy <= mr * mr * 0.85;
+        if (inA && !inB && my + dy < hy) blendPx(mx + dx, my + dy, [244, 240, 214], ma);
+      }
+    }
+    // 해
+    const sU = ((phase + 0.08) % 1) / 0.7;
+    let sun = null;
+    if (sU < 1.06) {
+      const r = Math.max(3, Math.round(W * 0.022));
+      const sx = Math.round(W * (0.08 + 0.84 * sU));
+      const sy = Math.round(hy - hy * 0.8 * Math.sin(sU * Math.PI));
+      const low = Math.pow(1 - Math.max(0, Math.sin(Math.min(sU, 1) * Math.PI)), 1.5);
+      const col = mix([255, 248, 214], [255, 104, 46], low);
+      sun = { x: sx, y: sy, r, col, low };
+      const G = r * 3;
+      for (let dy = -G; dy <= G; dy++) for (let dx = -G; dx <= G; dx++) {
+        const yy = sy + dy; if (yy >= hy) continue;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d <= r) blendPx(sx + dx, yy, col, 1);
+        else if (d <= G) blendPx(sx + dx, yy, col, 0.28 * (1 - (d - r) / (G - r)));
+      }
+    }
+    // 구름
+    const cloudCol = mix(mix(P.bot, [255, 255, 255], 0.55), P.top, night * 0.75);
+    const cloudShade = mix(cloudCol, P.top, 0.25);
+    for (const c of clouds) {
+      const span = W + c.rx * 4;
+      const cx = ((c.x0 + anim * c.sp) % span + span) % span - c.rx * 2;
+      const ry = c.rx * 0.38, a = 0.9 - 0.55 * night;
+      for (let dy = Math.floor(-ry * 1.4); dy <= Math.ceil(ry * 0.4); dy++) {
+        for (let dx = Math.floor(-c.rx); dx <= Math.ceil(c.rx); dx++) {
+          const e1 = (dx / c.rx) ** 2 + (dy / ry) ** 2;
+          const bx = dx + c.rx * 0.25, by = dy + ry * 0.55;
+          const e2 = (bx / (c.rx * 0.5)) ** 2 + (by / (ry * 0.95)) ** 2;
+          if (e1 < 1 || e2 < 1) blendPx(Math.round(cx + dx), c.y + dy, dy > 0 ? cloudShade : cloudCol, a);
+        }
+      }
+    }
+    // 갈매기
+    const gullA = 1 - night, gullCol = mix([252, 252, 252], [34, 32, 48], smooth(0.4, 0.52, phase));
+    if (gullA > 0.05) gulls.forEach((g, i) => {
+      const gx = Math.round(((g.x0 + anim * g.sp) % (W + 24)) - 12);
+      const gy = g.y + Math.round(Math.sin(anim * 0.7 + i * 2) * 2);
+      const up = Math.sin(anim * 7 + i * 1.7) > 0;
+      const pts = up ? [[-2, -1], [-1, 0], [0, 0], [1, 0], [2, -1]] : [[-2, 1], [-1, 0], [0, 0], [1, 0], [2, 1]];
+      for (const [dx, dy] of pts) blendPx(gx + dx, gy + dy, gullCol, gullA);
+    });
+    // 한라산
+    for (let x = 0; x < W; x++) if (hallaTop[x] >= 0) {
+      for (let y = hallaTop[x]; y < hy; y++) setPx(x, y, mix(P.hill, P.bot, 0.25 * (y - hallaTop[x]) / (hy - hallaTop[x] + 1)));
+    }
+    // 풍력발전기
+    const tc = mix(P.hill, [255, 255, 255], 0.4 * (1 - night) + 0.05);
+    [0.74, 0.81, 0.88].forEach((f, i) => {
+      const x = Math.round(W * f), b = hallaTop[x];
+      if (b < 0) return;
+      const th = Math.max(6, Math.round(W * 0.04)), hubY = b - th;
+      line(x, b, x, hubY, tc);
+      const bl = Math.round(th * 0.6), a0 = anim * 1.5 + i * 1.1;
+      for (let k = 0; k < 3; k++) {
+        const a = a0 + k * 2.094;
+        line(x, hubY, x + Math.cos(a) * bl, hubY + Math.sin(a) * bl, tc);
+      }
+      if (night > 0.1 && Math.sin(anim * 2.5 + i) > 0.3) setPx(x, hubY, mix(tc, [255, 50, 40], night));
+    });
+    // 성산일출봉
+    const rim = mix(P.land, P.bot, 0.35), cliff = mix(P.land, [0, 0, 0], 0.18);
+    for (let x = 0; x < W; x++) if (seongTop[x] >= 0) {
+      for (let y = seongTop[x]; y < hy; y++) {
+        let c = y === seongTop[x] ? rim : (hash(x, y) > 0.86 ? cliff : P.land);
+        setPx(x, y, c);
+      }
+    }
+    // 바다
+    const horizon = mix(P.far, P.bot, 0.5);
+    for (let x = 0; x < W; x++) setPx(x, hy, horizon);
+    const hiCol = mix(P.far, P.bot, 0.55);
+    for (let y = hy + 1; y < H; y++) {
+      const t = (y - hy) / (H - hy), dens = 1 / (0.22 + t);
+      const base = mix(P.far, P.near, Math.pow(t, 0.6));
+      const dark = mix(base, [0, 0, 0], 0.18), rowR = hash(y, 21);
+      for (let x = 0; x < W; x++) {
+        const w = 2 * Math.sin(x * 0.55 / (1 + t * 5) + anim * (0.8 + rowR) + rowR * 40) * (0.6 + 0.4 * Math.sin(x * 0.04 - anim * 0.5 + rowR * 9));
+        let c = base;
+        if (w > 1.45) c = hiCol; else if (w < -1.55) c = dark;
+        setPx(x, y, c);
+        if (sun && sun.y < hy + sun.r) {
+          const ww = sun.r * (0.7 + (y - hy) * 0.07), dx = Math.abs(x - sun.x);
+          if (dx < ww && w > -0.2) blendPx(x, y, sun.col, (0.2 + 0.6 * sun.low) * (1 - dx / ww) * (0.5 + 0.5 * Math.sin(anim * 3 + y * 2.3 + x)));
+        }
+        if (moon) {
+          const ww = 1.5 + (y - hy) * 0.05, dx = Math.abs(x - moon.x);
+          if (dx < ww && w > 0.3) blendPx(x, y, [230, 232, 250], 0.4 * moon.a * (1 - dx / ww));
+        }
+      }
+    }
+    // 고기잡이배와 집어등
+    for (const b of boats) {
+      const dir = b.i % 2 ? 1 : -1;
+      const bx = Math.round(((W * b.f + anim * 0.25 * dir) % W + W) % W);
+      const by = hy + 1 + (b.i % 2);
+      const hull = mix(P.rock, [0, 0, 0], 0.3);
+      for (let k = 0; k < 4; k++) setPx(bx + k, by, hull);
+      setPx(bx + 1, by - 1, hull);
+      if (night > 0.05) {
+        const lc = [255, 244, 196];
+        for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d <= 4) blendPx(bx + 2 + dx, by - 2 + dy, lc, 0.32 * night * (1 - d / 4));
+        }
+        setPx(bx + 2, by - 2, mix(horizon, lc, night));
+        for (let k = 1; k <= 6; k++) {
+          if (Math.sin(anim * 4 + k * 1.7 + b.i) > -0.3) blendPx(bx + 2 + (k % 2), by + k, lc, 0.55 * night * (1 - k / 7));
+        }
+      }
+    }
+    // 방파제와 빨간 등대
+    const seaH = H - hy, bwY = hy + Math.max(3, Math.round(seaH * 0.14));
+    const bw0 = Math.round(W * 0.6), lx = Math.round(W * 0.71);
+    const concrete = tint([176, 176, 168]), concreteD = tint([118, 118, 116]);
+    for (let x = bw0; x <= lx + 2; x++) { setPx(x, bwY, concrete); setPx(x, bwY + 1, concreteD); }
+    const red = tint([214, 52, 44]), white = tint([238, 238, 230]);
+    const lt = Math.max(7, Math.round(W * 0.045));
+    for (let k = 1; k <= lt; k++) for (let dx = -1; dx <= 1; dx++) setPx(lx + dx, bwY - k, (k > lt * 0.5 && k % 3 === 0) ? white : red);
+    const lampY = bwY - lt - 1;
+    setPx(lx - 1, lampY, red); setPx(lx + 1, lampY, red);
+    setPx(lx, lampY - 1, red); for (let dx = -1; dx <= 1; dx++) setPx(lx + dx, lampY - 2, concreteD);
+    const lamp = [255, 236, 160];
+    if (night > 0.05) {
+      const ang = anim * 1.4, c = Math.cos(ang), facing = Math.max(0, Math.sin(ang));
+      setPx(lx, lampY, mix(red, lamp, Math.min(1, night * (0.6 + facing))));
+      const L = W * 0.3 * Math.abs(c), dir = c > 0 ? 1 : -1;
+      for (let j = 2; j < L; j++) {
+        const a = 0.42 * night * (1 - j / L);
+        for (let w = -Math.floor(j / 12); w <= Math.floor(j / 12); w++) blendPx(lx + dir * j, lampY + w, lamp, a);
+      }
+      if (facing > 0.85) for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+        const d = Math.hypot(dx, dy); if (d <= 3) blendPx(lx + dx, lampY + dy, lamp, night * 0.5 * (1 - d / 3));
+      }
+    } else setPx(lx, lampY, tint([200, 210, 220]));
+
+    // 해녀의 주황 테왁
+    const floatA = 1 - night;
+    if (floatA > 0.05) floats.forEach((f, i) => {
+      const bob = Math.round(Math.sin(anim * 1.4 + i * 1.3) * 0.7);
+      const o = tint([255, 126, 36]), net = tint([40, 40, 46]);
+      blendPx(f.x, f.y + bob, o, floatA); blendPx(f.x + 1, f.y + bob, o, floatA);
+      blendPx(f.x, f.y + bob + 1, net, floatA * 0.7);
+      if (Math.sin(anim * 0.45 + i * 2.1) > 0.1) { // 물 위로 올라온 해녀
+        blendPx(f.x + 3, f.y + bob, net, floatA); blendPx(f.x + 3, f.y + bob - 1, net, floatA);
+        blendPx(f.x + 2, f.y + bob + 1, hiCol, floatA * 0.6); blendPx(f.x + 4, f.y + bob + 1, hiCol, floatA * 0.6);
+      }
+    });
+
+    // 현무암 바위와 부서지는 파도
+    const rockRim = mix(P.rock, P.bot, 0.3), hole = mix(P.rock, [0, 0, 0], 0.45);
+    const foam = [236, 244, 250];
+    for (let x = 0; x < W; x++) {
+      const ty = rockTop[x];
+      if (ty >= H) continue;
+      for (let y = ty; y < H; y++) setPx(x, y, y === ty ? rockRim : (hash(x, y) > 0.86 ? hole : P.rock));
+      if (Math.sin(anim * 2.1 + x * 0.9) > 0.55) blendPx(x, ty - 1, foam, 0.65 * (0.35 + 0.65 * day));
+    }
+    // 바위 위 유채꽃밭
+    const grass = tint([78, 146, 62]), grassD = tint([52, 104, 46]), yellow = tint([255, 218, 40]), yellowD = tint([232, 176, 20]);
+    for (let x = 0; x < W * 0.3; x++) {
+      const ty = rockTop[x];
+      if (ty >= H - 1) continue;
+      setPx(x, ty, grass); setPx(x, ty + 1, grassD);
+      if (hash(x, 41) > 0.4) {
+        const fh = 1 + (hash(x, 42) > 0.6 ? 1 : 0) + (hash(x, 43) > 0.85 ? 1 : 0);
+        const sway = Math.sin(anim * 1.6 + x * 0.35) > 0.8 ? 1 : 0;
+        for (let k = 1; k < fh; k++) setPx(x, ty - k, grassD);
+        setPx(x + sway, ty - fh, hash(x, 44) > 0.5 ? yellow : yellowD);
+        if (hash(x, 45) > 0.6) setPx(x + sway, ty - fh - 1, yellow);
+      }
+    }
+    // 돌하르방
+    const hx = Math.floor(W * 0.86) - 3, gy = rockTop[hx + 3];
+    if (gy < H - 4) {
+      const stone = mix(P.rock, P.bot, 0.18), eye = mix(P.rock, [0, 0, 0], 0.5);
+      const top = gy - HAREUBANG.length + 2;
+      HAREUBANG.forEach((row, r) => [...row].forEach((ch, c) => {
+        if (ch === '#') setPx(hx + c, top + r, stone);
+        else if (ch === 'o') setPx(hx + c, top + r, eye);
+      }));
+    }
+    // 야자수
+    const px0 = Math.round(W * 0.95), pb = rockTop[px0];
+    if (pb < H - 3) {
+      const ph = Math.max(10, Math.round(W * 0.08));
+      const bark = tint([128, 96, 60]), barkD = tint([92, 66, 42]);
+      let tx = px0, tyy = pb;
+      for (let k = 0; k <= ph; k++) {
+        tx = px0 - Math.round(Math.pow(k / ph, 2) * ph * 0.3);
+        tyy = pb - k;
+        setPx(tx, tyy, k % 2 ? bark : barkD);
+        if (k < ph * 0.35) setPx(tx + 1, tyy, barkD);
+      }
+      const leaf = tint([60, 150, 74]), leafD = tint([36, 104, 56]);
+      const fl = Math.round(ph * 0.6), sw = Math.sin(anim * 1.1) * 0.12;
+      [-2.95, -2.35, -1.75, -1.25, -0.7, -0.15].forEach((a0, n) => {
+        const a = a0 + sw;
+        for (let j = 1; j <= fl; j++) {
+          const fx = tx + Math.cos(a) * j, fy = tyy + Math.sin(a) * j + (j * j) / (fl * 1.4);
+          setPx(Math.round(fx), Math.round(fy), (j + n) % 3 ? leaf : leafD);
+        }
+      });
+      setPx(tx, tyy, leafD);
+    }
+    // 픽셀 디더링
+    const STEP = 10;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4, d = (BAYER[(y & 3) * 4 + (x & 3)] - 7.5) * 0.7;
+      buf[i] = Math.round((buf[i] + d) / STEP) * STEP;
+      buf[i + 1] = Math.round((buf[i + 1] + d) / STEP) * STEP;
+      buf[i + 2] = Math.round((buf[i + 2] + d) / STEP) * STEP;
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  /* ───────── 루프 ───────── */
+  let lastDraw = 0, lastName = '';
+  function loop(now) {
+    const t = total(), f = fmt(t);
+    timeEl.innerHTML = f.main + '<span class="cs">' + f.cs + '</span>';
+    lapNowEl.textContent = state.laps.length ? '랩 ' + (state.laps.length + 1) + '  ' + fmtText(t - lapSum()) : '';
+    if (now - lastDraw > 66) { // 약 15fps로 그려 픽셀 아트 느낌과 배터리 둘 다 챙김
+      lastDraw = now;
+      const phase = (t / state.cycle) % 1;
+      draw(phase, (now / 1000) * (reduceMotion ? 0.2 : 1));
+      const name = '지금: ' + phaseName(phase);
+      if (name !== lastName) { whenEl.textContent = name; lastName = name; }
+    }
+    requestAnimationFrame(loop);
+  }
+  addEventListener('resize', resize);
+  resize(); renderButtons(); renderLaps();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
